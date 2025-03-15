@@ -2,6 +2,7 @@
   (:require #?(:clj [electric-starter-app.debug :refer [pprint-str]])
             [electric-starter-app.mock :as mock]
             [electric-starter-app.model :as model]
+            [electric-starter-app.simplify-filters :refer [simplify-filters]]
             [hyperfiddle.electric3 :as e]
             [hyperfiddle.electric-dom3 :as dom]))
 
@@ -81,7 +82,8 @@
       (Table DisplayCell
              types
              type-k
-             (Search type-k (when (seq cart) [[:not [:in pk cart]]]))
+             (Search type-k (map simplify-filters
+                                 (conj filters [:not [:in pk cart]])))
              "Add"
              (e/fn [id]
                (e/server
@@ -90,7 +92,28 @@
                               (update-in st [(dec (count st)) :cart]
                                          conj id)))
                      (e/amb))))
-             (e/fn [x] (e/server (println "DBLCLK" (pprint-str x)))))
+             (e/fn [attr]
+               (e/server
+                 (println "DBLCLK" (pprint-str attr))
+                 (swap! !stack
+                        conj
+                        {:title (str "Choose " (:label attr))
+                         :type-k (:type attr)
+                         :filters []
+                         :cart #{}
+                         :Cb (e/fn [selections]
+                               (e/server
+                                 (swap! !stack
+                                        (fn [st]
+                                          (-> st
+                                              (update-in [(-> st count dec dec)
+                                                          :filters]
+                                                         conj
+                                                         [:in (:k attr) selections])
+                                              butlast
+                                              vec)))
+                                 nil))})
+                 nil)))
       (dom/h3 (dom/text "Selection"))
       (Table DisplayCell
              types
@@ -104,7 +127,13 @@
                               (update-in st [(dec (count st)) :cart]
                                          disj id)))
                      (e/amb))))
-             (e/fn [_] nil))))
+             (e/fn [_] nil))
+      (dom/button
+        (On "click" Cb cart)
+        (dom/text "Confirm"))
+      (dom/button
+        (On "click" Cb nil)
+        (dom/text "Cancel"))))
   ;; TODO: Submit button (and take callback? return (e/amb) while not selected?)
   )
 
@@ -131,4 +160,5 @@
                            model/types
                            "Choose task"
                            :task
-                           nil))))))
+                           (e/fn [choices]
+                             (e/server (println "CHOSE" (pr-str choices))))))))))

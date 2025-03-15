@@ -23,7 +23,12 @@
            (complement (compile-filter (first args))))
     :in (let [[k xs] args
               xss (set xs)]
-          #(contains? xss (get % k)))))
+          #(contains? xss (get % k)))
+    := #(apply = (map (fn [x]
+                        (if (keyword? x)
+                          (get % x)
+                          x))
+                      args))))
 
 (defn search [type-k filters]
   (prn "search" type-k filters)
