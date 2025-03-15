@@ -28,10 +28,12 @@
                                              (map :width attributes)))}})
       (dom/thead
         (dom/tr
-          (e/for [col (e/diff-by identity attributes)]
-            (dom/th (dom/props {:style {:width (-> col :width px)
-                                        :border-right table-border}})
-                    (dom/text (:label col))))))
+          (e/amb
+           (e/for [col (e/diff-by identity attributes)]
+             (dom/th (dom/props {:style {:width (-> col :width px)
+                                         :border-right table-border}})
+                     (dom/text (:label col))))
+           (dom/th (dom/text " ")))))
       (dom/tbody
         (e/for [row (e/diff-by identity items)]
           (dom/tr
