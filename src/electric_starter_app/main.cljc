@@ -1,5 +1,6 @@
 (ns electric-starter-app.main
-  (:require [electric-starter-app.mock :as mock]
+  (:require #?(:clj [electric-starter-app.debug :refer [pprint-str]])
+            [electric-starter-app.mock :as mock]
             [electric-starter-app.model :as model]
             [hyperfiddle.electric3 :as e]
             [hyperfiddle.electric-dom3 :as dom]))
@@ -56,29 +57,53 @@
 
 ;; XXX: allow initializing with some filters?
 ;; XXX: take callback?
-(e/defn YakSearch [Search DisplayCell types type-k]
+(e/defn YakSearch* [Search DisplayCell types !stack]
   ;; TODO: breadcrumb view
   ;; TODO: filters input
   (e/server
-   (let [!cart (atom #{1})
-         cart (e/watch !cart)
-         {:keys [pk] :as _type} (get types type-k)]
-     (dom/h3 (dom/text "Options"))
-     (Table DisplayCell
-            types
-            type-k
-            (Search type-k (when (seq cart) [[:not [:in pk cart]]]))
-            "Add"
-            (e/fn [id] (e/server (do (swap! !cart conj id) nil))))
-     (dom/h3 (dom/text "Selection"))
-     (Table DisplayCell
-            types
-            type-k
-            (when (seq cart) (Search type-k [[:in pk cart]]))
-            "Remove"
-            (e/fn [id] (e/server (do (swap! !cart disj id) nil))))))
+    (let [stack (e/watch !stack)
+          {:keys [title type-k filters cart Cb]} (last stack)
+          {:keys [pk] :as _type} (get types type-k)]
+      (dom/pre (dom/text (pprint-str stack)))
+      (dom/h3 (dom/text "Options"))
+      (Table DisplayCell
+             types
+             type-k
+             (Search type-k (when (seq cart) [[:not [:in pk cart]]]))
+             "Add"
+             (e/fn [id]
+               (e/server
+                 (do (swap! !stack
+                            (fn [st]
+                              (update-in st [(dec (count st)) :cart]
+                                         conj id)))
+                     (e/amb)))))
+      (dom/h3 (dom/text "Selection"))
+      (Table DisplayCell
+             types
+             type-k
+             (when (seq cart) (Search type-k [[:in pk cart]]))
+             "Remove"
+             (e/fn [id]
+               (e/server
+                 (do (swap! !stack
+                            (fn [st]
+                              (update-in st [(dec (count st)) :cart]
+                                         conj id)))
+                     (e/amb)))))))
   ;; TODO: Submit button (and take callback? return (e/amb) while not selected?)
   )
+
+(e/defn YakSearch [Search DisplayCell types title type-k Cb]
+  (e/server
+    (YakSearch* Search
+                DisplayCell
+                types
+                (atom [{:title title
+                        :type-k type-k
+                        :filters []
+                        :cart #{}
+                        :Cb Cb}]))))
 
 (e/defn Main [ring-request]
   (e/client
@@ -87,4 +112,9 @@
       ; mandatory wrapper div https://github.com/hyperfiddle/electric/issues/74
       (dom/div (dom/props {:style {:display "contents"}})
                (e/server
-                (YakSearch mock/Search mock/DisplayCell model/types :task))))))
+                (YakSearch mock/Search
+                           mock/DisplayCell
+                           model/types
+                           "Choose task"
+                           :task
+                           nil))))))
