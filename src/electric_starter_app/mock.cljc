@@ -45,3 +45,38 @@
 
 (e/defn DisplayCell [type-k item-k]
   (display type-k item-k))
+
+(def ingredients-vector
+  (let [grains ["flour" "rice" "oats" "cornmeal" "barley" "quinoa" "couscous" "bulgur" "farro" "millet"]
+        spices ["salt" "pepper" "cinnamon" "cumin" "paprika" "oregano" "basil" "thyme" "rosemary" "nutmeg"
+                "cardamom" "turmeric" "ginger" "cloves" "coriander" "bay leaves" "saffron" "fennel seeds" "star anise" "vanilla"]
+        vegetables ["onion" "garlic" "carrot" "potato" "tomato" "bell pepper" "zucchini" "eggplant" "spinach" "kale"
+                    "broccoli" "cauliflower" "cabbage" "lettuce" "cucumber" "celery" "mushroom" "corn" "peas" "green beans"]
+        fruits ["apple" "banana" "orange" "lemon" "lime" "strawberry" "blueberry" "raspberry" "blackberry" "cherry"
+                "peach" "pear" "plum" "grape" "mango" "pineapple" "watermelon" "kiwi" "avocado" "coconut"]
+        proteins ["chicken" "beef" "pork" "lamb" "turkey" "tofu" "tempeh" "eggs" "salmon" "tuna"
+                  "shrimp" "beans" "lentils" "chickpeas" "nuts" "seeds" "yogurt" "cheese" "milk" "cream"]
+        all-ingredients (concat grains spices vegetables fruits proteins)
+
+        grain-weights (range 100 1001 100)       ;; 100g to 1000g
+        spice-weights (range 5 101 5)            ;; 5g to 100g
+        vegetable-weights (range 50 501 50)      ;; 50g to 500g
+        fruit-weights (range 75 751 75)          ;; 75g to 750g
+        protein-weights (range 125 1251 125)     ;; 125g to 1250g
+
+        ingredient-weights (fn [ingredient]
+                            (cond
+                              (some #(= ingredient %) grains) (rand-nth grain-weights)
+                              (some #(= ingredient %) spices) (rand-nth spice-weights)
+                              (some #(= ingredient %) vegetables) (rand-nth vegetable-weights)
+                              (some #(= ingredient %) fruits) (rand-nth fruit-weights)
+                              (some #(= ingredient %) proteins) (rand-nth protein-weights)
+                              :else 100))
+        _ (prn "count" (count all-ingredients))
+
+        selected-ingredients (take 100 (shuffle all-ingredients))]
+
+    (mapv (fn [ingredient]
+            {:grams (ingredient-weights ingredient)
+             :ingredient ingredient})
+          selected-ingredients)))

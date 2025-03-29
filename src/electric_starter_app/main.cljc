@@ -4,11 +4,8 @@
             [electric-starter-app.model :as model]
             [electric-starter-app.simplify-filters :refer [simplify-filters]]
             [hyperfiddle.electric3 :as e]
-            [hyperfiddle.electric-dom3 :as dom]))
-
-;; XXX state é stack de seleçons, só mostramos a última
-;; XXX for odd/even highlighting, even with infinite scroll, track parity of
-;; absolute offset
+            [hyperfiddle.electric-dom3 :as dom]
+            [hyperfiddle.electric-forms5 :as form]))
 
 (defn px [n]
   (str n "px"))
@@ -148,13 +145,39 @@
                         :cart #{}
                         :Cb Cb}]))))
 
+(e/defn VirtualScrollTest []
+  (let [row-height 24
+        viewport-rows 20]
+    (dom/div
+      (dom/style (dom/text form/css))
+      ;; Total height better be an exact multiple of row height. I
+      ;; found this fixed an issue where every screen two consecutive
+      ;; rows would have a grey background.
+      (dom/props {:style {:height (px (* row-height viewport-rows))
+                          ;; set this or table cells will be stacked vertically
+                          :--column-count 2}})
+      (form/VirtualScroll
+       :table
+       :tr
+       row-height
+       1
+       (into []
+             (take 1000
+                   (cycle mock/ingredients-vector)))
+       (e/fn [_index {:keys [grams ingredient]}]
+         (dom/td (dom/text (str grams)))
+         (dom/td (dom/text (str ingredient))))))))
+
 (e/defn Main [ring-request]
   (e/client
     (binding [dom/node js/document.body
               e/http-request (e/server ring-request)]
       ; mandatory wrapper div https://github.com/hyperfiddle/electric/issues/74
       (dom/div (dom/props {:style {:display "contents"}})
-               (e/server
+               (dom/h1 (dom/text "Hello!"))
+               (VirtualScrollTest)
+               
+               #_(e/server
                 (YakSearch mock/Search
                            mock/DisplayCell
                            model/types
