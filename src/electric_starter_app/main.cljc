@@ -3,6 +3,7 @@
             [electric-starter-app.mock :as mock]
             [electric-starter-app.model :as model]
             [electric-starter-app.simplify-filters :refer [simplify-filters]]
+            [electric-starter-app.ui :refer [On]]
             [hyperfiddle.electric3 :as e]
             [hyperfiddle.electric-dom3 :as dom]))
 
@@ -18,14 +19,6 @@
 (def cell-padding 8)
 
 (defn width [col-width])
-
-(e/defn On [evt Cb & args]
-  (e/client
-    (when-some [t (let [e (dom/On evt identity nil)
-                        [t _] (e/Token e)]
-                    t)]
-      (case (e/apply Cb args)
-        (do (t) (e/amb))))))
 
 (e/defn Table [DisplayCell
                types
