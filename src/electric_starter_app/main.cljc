@@ -24,46 +24,35 @@
       (case (e/apply Cb args)
         (do (t) (e/amb))))))
 
-(e/defn Table [DisplayCell
-               types
+(def row-height 24)
+
+(def table-rows 10)
+
+(e/defn Table [types
                type-k
                items
-               button-label
-               ButtonAction
-               HeaderDoubleClickAction]
-  (let [{:keys [attributes pk] :as _type} (get types type-k)]
-    (dom/table
-      (dom/props {:style {:border table-border
-                          :table-layout "fixed"
-                          :border-collapse "collapse"
-                          :width (px (reduce +
-                                             100
-                                             (map :width attributes)))}})
-      (dom/thead
-        (dom/tr
-          (e/amb
-           (e/for [col (e/diff-by identity attributes)]
-             (dom/th
-               (On "dblclick" HeaderDoubleClickAction col)
-               (dom/props {:style {:width (-> col :width px)
-                                   :border-right table-border}})
-               (dom/text (:label col))))
-           (dom/th (dom/text " ")))))
-      (dom/tbody
-        (e/for [row (e/diff-by identity items)]
-          (dom/tr
-            (e/amb
-             (e/for [col (e/diff-by identity attributes)]
-               (dom/td
-                 (dom/props {:style {:width (-> col :width px)
-                                     :border-top table-border
-                                     :border-right table-border}})
-                 (dom/text (DisplayCell (:type col) (get row (:k col))))))
-             (dom/td
-               (dom/props {:style {:width 100
-                                   :border-top table-border}})
-               (dom/button (dom/text button-label)
-                           (On "click" ButtonAction (pk row)))))))))))
+               HeaderDoubleClickAction
+               Row]
+  (let [{:keys [attributes] :as _type} (get types type-k)]
+    (dom/div
+      (dom/style (dom/text form/css))
+      ;; Total height better be an exact multiple of row height. I
+      ;; found this fixed an issue where every screen two consecutive
+      ;; rows would have a grey background.
+      (dom/props {:style {:height (px (* row-height table-rows))
+                          ;; set this or table cells will be stacked vertically
+                          :--column-count (count attributes)}})
+      ;; XXX: add back header.
+      ;; XXX: add back column widths, at least as min-width
+      (form/VirtualScroll :table :tr row-height 1 items Row))))
+
+(e/defn Row [DisplayCell types type-k OnClick _index row]
+  (e/server
+    (let [{:keys [attributes pk] :as _type} (get types type-k)]
+      (On "click" OnClick (pk row))
+      (e/for [col (e/diff-by identity attributes)]
+        (dom/td
+          (dom/text (DisplayCell (:type col) (get row (:k col)))))))))
 
 ;; XXX: allow initializing with some filters?
 ;; XXX: take callback?
@@ -76,19 +65,9 @@
           {:keys [pk] :as _type} (get types type-k)]
       (dom/pre (dom/text (pprint-str stack)))
       (dom/h3 (dom/text "Options"))
-      (Table DisplayCell
-             types
+      (Table types
              type-k
-             (Search type-k (map simplify-filters
-                                 (conj filters [:not [:in pk cart]])))
-             "Add"
-             (e/fn [id]
-               (e/server
-                 (do (swap! !stack
-                            (fn [st]
-                              (update-in st [(dec (count st)) :cart]
-                                         conj id)))
-                     (e/amb))))
+             (Search type-k (map simplify-filters filters))
              (e/fn [attr]
                (e/server
                  (println "DBLCLK" (pprint-str attr))
@@ -110,21 +89,34 @@
                                               butlast
                                               vec)))
                                  nil))})
-                 nil)))
+                 nil))
+             (e/Partial Row
+                        DisplayCell
+                        types
+                        type-k
+                        (e/fn [id]
+                          (e/server
+                            (do (swap! !stack
+                                       (fn [st]
+                                         (update-in st [(dec (count st)) :cart]
+                                                    conj id)))
+                                nil)))))
       (dom/h3 (dom/text "Selection"))
-      (Table DisplayCell
-             types
+      (Table types
              type-k
              (when (seq cart) (Search type-k [[:in pk cart]]))
-             "Remove"
-             (e/fn [id]
-               (e/server
-                 (do (swap! !stack
-                            (fn [st]
-                              (update-in st [(dec (count st)) :cart]
-                                         disj id)))
-                     (e/amb))))
-             (e/fn [_] nil))
+             (e/fn [_] nil)
+             (e/Partial Row
+                        DisplayCell
+                        types
+                        type-k
+                        (e/fn [id]
+                          (e/server
+                            (do (swap! !stack
+                                       (fn [st]
+                                         (update-in st [(dec (count st)) :cart]
+                                                    disj id)))
+                                (e/amb))))))
       (dom/button
         (On "click" Cb cart)
         (dom/text "Confirm"))
@@ -145,29 +137,6 @@
                         :cart #{}
                         :Cb Cb}]))))
 
-(e/defn VirtualScrollTest []
-  (let [row-height 24
-        viewport-rows 20]
-    (dom/div
-      (dom/style (dom/text form/css))
-      ;; Total height better be an exact multiple of row height. I
-      ;; found this fixed an issue where every screen two consecutive
-      ;; rows would have a grey background.
-      (dom/props {:style {:height (px (* row-height viewport-rows))
-                          ;; set this or table cells will be stacked vertically
-                          :--column-count 2}})
-      (form/VirtualScroll
-       :table
-       :tr
-       row-height
-       1
-       (into []
-             (take 1000
-                   (cycle mock/ingredients-vector)))
-       (e/fn [_index {:keys [grams ingredient]}]
-         (dom/td (dom/text (str grams)))
-         (dom/td (dom/text (str ingredient))))))))
-
 (e/defn Main [ring-request]
   (e/client
     (binding [dom/node js/document.body
@@ -175,9 +144,7 @@
       ; mandatory wrapper div https://github.com/hyperfiddle/electric/issues/74
       (dom/div (dom/props {:style {:display "contents"}})
                (dom/h1 (dom/text "Hello!"))
-               (VirtualScrollTest)
-               
-               #_(e/server
+               (e/server
                 (YakSearch mock/Search
                            mock/DisplayCell
                            model/types
