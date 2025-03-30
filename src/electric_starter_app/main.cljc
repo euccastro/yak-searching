@@ -18,11 +18,11 @@
 
 (e/defn On [evt Cb & args]
   (e/client
-    (when-some [t (let [e (dom/On evt identity nil)
+    (when-some [t (let [e (dom/On* evt identity nil)
                         [t _] (e/Token e)]
                     t)]
       (case (e/apply Cb args)
-        (do (t) (e/amb))))))
+        (do (t) nil)))))
 
 (def row-height 24)
 
@@ -79,16 +79,17 @@
                          :cart #{}
                          :Cb (e/fn [selections]
                                (e/server
-                                 (swap! !stack
-                                        (fn [st]
-                                          (-> st
-                                              (update-in [(-> st count dec dec)
-                                                          :filters]
-                                                         conj
-                                                         [:in (:k attr) selections])
-                                              butlast
-                                              vec)))
-                                 nil))})
+                                 (do
+                                   (swap! !stack
+                                          (fn [st]
+                                            (-> st
+                                                (update-in [(-> st count dec dec)
+                                                            :filters]
+                                                           conj
+                                                           [:in (:k attr) selections])
+                                                butlast
+                                                vec)))
+                                   nil)))})
                  nil))
              (e/Partial Row
                         DisplayCell
@@ -112,11 +113,12 @@
                         type-k
                         (e/fn [id]
                           (e/server
-                            (do (swap! !stack
-                                       (fn [st]
-                                         (update-in st [(dec (count st)) :cart]
-                                                    disj id)))
-                                (e/amb))))))
+                            (do
+                              (swap! !stack
+                                     (fn [st]
+                                       (update-in st [(dec (count st)) :cart]
+                                                  disj id)))
+                              nil)))))
       (dom/button
         (On "click" Cb cart)
         (dom/text "Confirm"))
